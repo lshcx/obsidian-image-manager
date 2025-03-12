@@ -4,22 +4,32 @@ import { DEFAULT_SETTINGS } from './const/settings';
 import { SettingsTab } from './setting/settings';
 import { IUploader } from './interface/uploader';
 import { UploaderFactory } from './uploader/factory';
+import { ImageManagerFactory } from './manager/manager';
+import { EditorModule } from './editor/editor_module';
 
 
 export default class ImageManagerPlugin extends Plugin {
 	settings: ISettings;
 	uploader: IUploader;
+	managerFactory: ImageManagerFactory;
+	editorModule: EditorModule;
 
 	async onload() {
 		await this.loadSettings();
 
 		// Build the uploader
 		this.buildUploader();
+		
+		// Create the manager factory
+		this.managerFactory = new ImageManagerFactory(this);
+		
+		// Initialize editor module
+		this.editorModule = new EditorModule(this);
 
 		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
+		const ribbonIconEl = this.addRibbonIcon('image-file', '图片管理', (evt: MouseEvent) => {
 			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
+			new Notice('图片管理插件已启用');
 		});
 		// Perform additional things with the ribbon
 		ribbonIconEl.addClass('my-plugin-ribbon-class');
@@ -80,7 +90,7 @@ export default class ImageManagerPlugin extends Plugin {
 	}
 
 	onunload() {
-
+		// Clean up any resources
 	}
 
 	async loadSettings() {

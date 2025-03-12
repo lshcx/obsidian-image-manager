@@ -1,7 +1,6 @@
 import { IUploader, IUploadOptions } from "../../interface/uploader";
 import { exec } from "child_process";
 import { _T } from "../../lang/helpers";
-import { deleteFiles } from "../../utils/io";
 
 
 /**
@@ -64,16 +63,6 @@ export class CustomUploader implements IUploader {
             } catch (error) {
                 options.onError?.(`${_T("ERROR_UPLOAD_COMMAND_PARSE")}: ${error}`);
                 throw error;
-            }
-
-            if (options.isDeleteTemp) {
-                // delete the temp files
-                const success = await deleteFiles(files.split(","));
-                if (!success) {
-                    // don't throw error, just notify
-                    // because even if the delete failed, we have already got the urls
-                    options.onError?.(`${_T("ERROR_UPLOAD_DELETE")}`);
-                }
             }
 
             options.onSuccess?.(result);

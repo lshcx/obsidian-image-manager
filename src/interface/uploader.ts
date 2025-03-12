@@ -4,7 +4,6 @@ import { UploadMode } from "./settings";
  * interface for upload options
  */
 export interface IUploadOptions {
-    isDeleteTemp: boolean;
     onStart?: () => void;
     onProgress?: (message: string) => void;
     onError?: (error: string) => void;

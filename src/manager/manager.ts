@@ -1,134 +1,93 @@
+import { App } from "obsidian";
+import { DocumentImageManager, IDocumentImageManager } from "./document_manager";
 import ImageManagerPlugin from "../main";
-import * as path from "path";
-import * as fs from "fs";
-
 
 /**
- * image info
+ * Manager factory for creating and managing document image managers
  */
-export class ImageInfo {
-
-    // the local path of the image
-    localPath: string;
-
-    // the remote path of the image
-    remotePath: string;
-
-    // whether the image is uploaded
-    isUploaded: boolean;
-
-    constructor(data: Partial<ImageInfo>) {
-        this.localPath = data.localPath || "";
-        this.remotePath = data.remotePath || "";
-        this.isUploaded = data.isUploaded || false;
-    }
-}
-
-interface Info {
-    isValid: boolean;  // whether the info is valid
-    vaultPath: string;  // the vault path
-    curFile: string;    // full path of the current file
-    curFileFolder: string;  // folder of the current file
-    curFileName: string;  // name of the current file
-    curFileNameWithoutExtension: string;  // name of the current file without extension
-    imageInfoFileFolder: string;  // the image info file folder
-    imageInfoFilePath: string;  // the image info file path
-}
-
-
-/**
- * manager
- */
-export class Manager{
-
-    private info: Info;
-
-    // the image infos
-    private imageInfos: ImageInfo[];
-
-    // the plugin
+export class ImageManagerFactory {
     private plugin: ImageManagerPlugin;
-
-    // constructor
+    private managers: Map<string, IDocumentImageManager>;
+    
+    /**
+     * Constructor
+     * @param plugin Plugin instance
+     */
     constructor(plugin: ImageManagerPlugin) {
         this.plugin = plugin;
-        this.imageInfos = [];
-        this.parsePath();
-
-        this.load();
-    }
-
-    // load the image infos from a json file
-    async load(): Promise<boolean> {
-        if (!this.info.isValid) {
-            return Promise.resolve(false);
-        }
-
-        if (fs.existsSync(this.info.imageInfoFilePath)) {
-            const imageInfos = JSON.parse(fs.readFileSync(this.info.imageInfoFilePath, "utf8"));
-            this.imageInfos = imageInfos.map((imageInfo: ImageInfo) => new ImageInfo(imageInfo));
-        }
-
-        return Promise.resolve(true);
-    }
-
-    // save the image infos to a json file
-    async save(): Promise<boolean> {
-        if (!this.info.isValid) {
-            return Promise.resolve(false);
-        }
-
-        if (!fs.existsSync(this.info.imageInfoFileFolder)) {
-            fs.mkdirSync(this.info.imageInfoFileFolder, { recursive: true });
-        }
-
-        fs.writeFileSync(this.info.imageInfoFilePath, JSON.stringify(this.imageInfos, null, 2));
-        return Promise.resolve(true);
+        this.managers = new Map();
     }
     
-    // add the image info
-    async add(imageInfo: ImageInfo): Promise<void> {
-        await this.save();
-    }
-
-    // remove the image info
-    async remove(imageInfo: ImageInfo): Promise<void> {
-        await this.save();
-    }
-
-    // move the image folder
-    async move(dstPath: string): Promise<void> {
-        return Promise.resolve();
-    }
-
-    // paste the image info
-    async paste(): Promise<void> {
-        return Promise.resolve();
-    }
-
-    // insert the image info
-    async insert(imageInfo: ImageInfo): Promise<void> {
-        return Promise.resolve();
-    }
-
-    private parsePath(): void {
-        this.info.vaultPath = this.plugin.app.vault.getRoot().path;
-        this.info.curFile = this.plugin.app.workspace.getActiveFile()?.path || "";
-        if (this.info.curFile !== "") {
-            this.info.isValid = true;
-            this.info.curFileFolder = path.dirname(this.info.curFile);
-            this.info.curFileName = path.basename(this.info.curFile);
-            this.info.curFileNameWithoutExtension = path.basename(this.info.curFile, path.extname(this.info.curFile));
-            // imageInfoFileFolder is like `_assets.{{filename}}`
-            this.info.imageInfoFileFolder = path.join(this.info.curFileFolder, this.plugin.settings.tempFolderPath.replace("{{filename}}", this.info.curFileName));
-            this.info.imageInfoFilePath = path.join(this.info.imageInfoFileFolder, "index.json");
-        } else {
-            this.info.isValid = false;
-            this.info.curFileFolder = "";
-            this.info.curFileName = "";
-            this.info.curFileNameWithoutExtension = "";
-            this.info.imageInfoFileFolder = "";
-            this.info.imageInfoFilePath = "";
+    /**
+     * Get or create a document image manager
+     * @param mdPath Document path
+     * @returns Document image manager
+     */
+    async getManager(mdPath: string): Promise<IDocumentImageManager> {
+        // Check if manager already exists
+        if (this.managers.has(mdPath)) {
+            return this.managers.get(mdPath)!;
         }
+        
+        // Create new manager
+        const manager = new DocumentImageManager(
+            this.plugin.app,
+            this.plugin.settings,
+            this.plugin.uploader,
+            mdPath
+        );
+        
+        // Load existing data if available
+        await manager.loadFromJson();
+        
+        // Store manager
+        this.managers.set(mdPath, manager);
+        
+        return manager;
     }
-}
+    
+    /**
+     * Remove a document image manager
+     * @param mdPath Document path
+     */
+    removeManager(mdPath: string): void {
+        this.managers.delete(mdPath);
+    }
+    
+    /**
+     * Rename a document image manager
+     * @param oldPath Old document path
+     * @param newPath New document path
+     * @returns Whether renaming was successful
+     */
+    async renameManager(oldPath: string, newPath: string): Promise<boolean> {
+        // Check if manager exists
+        if (!this.managers.has(oldPath)) {
+            return false;
+        }
+        
+        // Get manager
+        const manager = this.managers.get(oldPath)!;
+        
+        // Rename image folder
+        const success = await manager.renameImageFolder(newPath);
+        
+        if (success) {
+            // Store manager with new path
+            this.managers.set(newPath, manager);
+            
+            // Remove old manager
+            this.managers.delete(oldPath);
+        }
+        
+        return success;
+    }
+    
+    /**
+     * Get all document image managers
+     * @returns Array of document image managers
+     */
+    getAllManagers(): IDocumentImageManager[] {
+        return Array.from(this.managers.values());
+    }
+} 

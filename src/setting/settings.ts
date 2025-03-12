@@ -170,7 +170,6 @@ export class SettingsTab extends PluginSettingTab {
                     // upload the files
                     try {   
                         await this.plugin.uploader.upload(testFiles, {
-                            isDeleteTemp: this.plugin.settings.isDeleteTemp,
                             onStart: () => {
                             testArea.value = _T("UPLOAD_TESTING_AREA_START") + "\n";
                             },
